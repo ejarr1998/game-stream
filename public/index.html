@@ -215,6 +215,13 @@
       opacity: 0.9;
     }
     
+    .team-btn .league-badge {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      font-size: 0.65rem;
+    }
+    
     .games-list {
       display: flex;
       flex-direction: column;
@@ -402,6 +409,62 @@
     .team-btn.hidden {
       display: none;
     }
+    
+    .my-teams-section {
+      margin-bottom: 20px;
+    }
+    
+    .my-teams-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, rgba(0, 212, 255, 0.15), rgba(123, 44, 191, 0.15));
+      border: 1px solid rgba(0, 212, 255, 0.3);
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.2s;
+      margin-bottom: 12px;
+    }
+    
+    .my-teams-header:hover {
+      background: linear-gradient(135deg, rgba(0, 212, 255, 0.25), rgba(123, 44, 191, 0.25));
+    }
+    
+    .my-teams-header .collapse-icon {
+      margin-left: auto;
+      transition: transform 0.3s;
+    }
+    
+    .my-teams-header.collapsed .collapse-icon {
+      transform: rotate(-90deg);
+    }
+    
+    .my-teams-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 8px;
+      overflow: hidden;
+      transition: max-height 0.3s ease, opacity 0.3s ease;
+      max-height: 2000px;
+      opacity: 1;
+      margin-bottom: 15px;
+    }
+    
+    .my-teams-grid.collapsed {
+      max-height: 0;
+      opacity: 0;
+      margin-bottom: 0;
+    }
+    
+    .no-teams-msg {
+      grid-column: 1 / -1;
+      color: #666;
+      font-size: 0.9rem;
+      text-align: center;
+      padding: 20px;
+    }
   </style>
 </head>
 <body>
@@ -462,6 +525,19 @@
       <p style="color: #888; margin-bottom: 15px; font-size: 0.9rem;">
         Select the teams you want to follow. You'll be notified when they play.
       </p>
+      
+      <div class="my-teams-section">
+        <div class="my-teams-header" onclick="toggleMyTeams()">
+          <span class="icon">💫</span>
+          <span class="league-name">My Teams</span>
+          <span id="myTeamsCount" style="color: #666; font-size: 0.85rem;">(0 selected)</span>
+          <span class="collapse-icon" id="myTeamsCollapseIcon">▼</span>
+        </div>
+        <div class="my-teams-grid" id="myTeamsGrid">
+          <p class="no-teams-msg" id="noTeamsMsg">No teams selected yet. Choose from the leagues below!</p>
+        </div>
+      </div>
+      
       <div class="search-box">
         <input type="text" id="teamSearch" placeholder="Search teams..." oninput="filterTeams()">
       </div>
@@ -504,11 +580,67 @@
       allTeams = await teamsResponse.json();
       
       renderTeams();
+      renderMyTeams();
       loadGames();
     }
     
     // Track collapsed state
     const collapsedLeagues = JSON.parse(localStorage.getItem('gamewatch_collapsed') || '{}');
+    let myTeamsCollapsed = localStorage.getItem('gamewatch_myteams_collapsed') === 'true';
+    
+    function toggleMyTeams() {
+      myTeamsCollapsed = !myTeamsCollapsed;
+      localStorage.setItem('gamewatch_myteams_collapsed', myTeamsCollapsed);
+      
+      const header = document.querySelector('.my-teams-header');
+      const grid = document.getElementById('myTeamsGrid');
+      
+      header.classList.toggle('collapsed', myTeamsCollapsed);
+      grid.classList.toggle('collapsed', myTeamsCollapsed);
+    }
+    
+    function renderMyTeams() {
+      const grid = document.getElementById('myTeamsGrid');
+      const countSpan = document.getElementById('myTeamsCount');
+      const noTeamsMsg = document.getElementById('noTeamsMsg');
+      const header = document.querySelector('.my-teams-header');
+      
+      // Gather all selected teams
+      const selectedTeams = [];
+      for (const [league, teams] of Object.entries(userData.teams || {})) {
+        for (const abbrev of teams) {
+          const team = allTeams[league]?.find(t => t.abbrev === abbrev);
+          if (team) {
+            selectedTeams.push({ ...team, league });
+          }
+        }
+      }
+      
+      countSpan.textContent = `(${selectedTeams.length} selected)`;
+      
+      // Apply collapsed state
+      header.classList.toggle('collapsed', myTeamsCollapsed);
+      grid.classList.toggle('collapsed', myTeamsCollapsed);
+      
+      if (selectedTeams.length === 0) {
+        grid.innerHTML = `<p class="no-teams-msg">No teams selected yet. Choose from the leagues below!</p>`;
+        return;
+      }
+      
+      grid.innerHTML = selectedTeams.map(team => `
+        <button 
+          class="team-btn selected"
+          data-league="${team.league}"
+          data-abbrev="${team.abbrev}"
+          onclick="event.stopPropagation(); toggleTeam('${team.league}', '${team.abbrev}')"
+          style="background: ${team.color || '#333'};"
+        >
+          <span class="abbrev">${team.abbrev}</span>
+          <span class="city">${team.city}</span>
+          <span class="league-badge">${leagueInfo[team.league]?.icon || ''}</span>
+        </button>
+      `).join('');
+    }
     
     function toggleLeague(league) {
       collapsedLeagues[league] = !collapsedLeagues[league];
@@ -573,11 +705,8 @@
       }
       
       // Update UI immediately
-      const btn = document.querySelector(`[data-league="${league}"][data-abbrev="${abbrev}"]`);
-      btn.classList.toggle('selected');
-      
-      // Update count
       renderTeams();
+      renderMyTeams();
       
       // Save to server
       await fetch(`/api/user/${userId}/teams`, {
