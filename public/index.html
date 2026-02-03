@@ -340,6 +340,33 @@
       color: #666;
       margin-top: 10px;
     }
+    
+    .search-box {
+      margin-bottom: 20px;
+    }
+    
+    .search-box input {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(0, 0, 0, 0.3);
+      color: #fff;
+      font-size: 1rem;
+    }
+    
+    .search-box input::placeholder {
+      color: #666;
+    }
+    
+    .search-box input:focus {
+      outline: none;
+      border-color: #00d4ff;
+    }
+    
+    .team-btn.hidden {
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -355,6 +382,7 @@
         Subscribe to your personal notification channel to get alerts when games start:
       </p>
       <div class="ntfy-topic">
+        <label style="color: #888; font-size: 0.9rem;">Your topic:</label>
         <input type="text" id="ntfyUrl" readonly placeholder="Loading...">
         <button onclick="copyNtfyUrl()">Copy</button>
       </div>
@@ -376,19 +404,23 @@
           <option value="default">Default Browser</option>
           <option value="chrome">Chrome</option>
           <option value="firefox">Firefox</option>
-          <option value="safari">Safari</option>
           <option value="brave">Brave</option>
           <option value="edge">Edge</option>
+          <option value="samsung">Samsung Internet</option>
+          <option value="opera">Opera</option>
         </select>
       </div>
-      <p class="setting-note">Note: Browser selection works best on desktop. On mobile, links open in your default browser.</p>
+      <p class="setting-note">Android: Opens in selected browser. iOS/Desktop: Uses your default browser.</p>
     </div>
     
     <div class="card">
       <h2><span class="icon">⭐</span> Your Teams</h2>
-      <p style="color: #888; margin-bottom: 20px; font-size: 0.9rem;">
+      <p style="color: #888; margin-bottom: 15px; font-size: 0.9rem;">
         Select the teams you want to follow. You'll be notified when they play.
       </p>
+      <div class="search-box">
+        <input type="text" id="teamSearch" placeholder="Search teams..." oninput="filterTeams()">
+      </div>
       <div id="teamsContainer">
         <div class="loading">Loading teams...</div>
       </div>
@@ -427,8 +459,8 @@
       userId = userData.userId;
       localStorage.setItem('gamewatch_userId', userId);
       
-      // Update ntfy URL
-      document.getElementById('ntfyUrl').value = `ntfy.sh/${userData.ntfyTopic}`;
+      // Update ntfy topic (just the topic name, not the full URL)
+      document.getElementById('ntfyUrl').value = userData.ntfyTopic;
       
       // Load teams
       const teamsResponse = await fetch('/api/teams');
@@ -546,7 +578,7 @@
                     </div>
                   </div>
                   ${game.streamUrl ? `
-                    <a href="${game.streamUrl}" onclick="event.preventDefault(); window.open(getStreamLink('${game.streamUrl}'), '_blank');" class="watch-btn">
+                    <a href="${game.streamUrl}" onclick="event.preventDefault(); openStream('${game.streamUrl}');" class="watch-btn">
                       Watch
                     </a>
                   ` : ''}
@@ -604,20 +636,61 @@
       document.getElementById('browserSelect').value = browser;
     }
     
+    function filterTeams() {
+      const search = document.getElementById('teamSearch').value.toLowerCase().trim();
+      const buttons = document.querySelectorAll('.team-btn');
+      
+      buttons.forEach(btn => {
+        const abbrev = btn.dataset.abbrev.toLowerCase();
+        const league = btn.dataset.league.toLowerCase();
+        const city = btn.querySelector('.city')?.textContent.toLowerCase() || '';
+        
+        // Get full team name from allTeams
+        const team = allTeams[btn.dataset.league]?.find(t => t.abbrev === btn.dataset.abbrev);
+        const fullName = team?.name.toLowerCase() || '';
+        
+        const matches = abbrev.includes(search) || 
+                       city.includes(search) || 
+                       fullName.includes(search) ||
+                       league.includes(search);
+        
+        btn.classList.toggle('hidden', !matches);
+      });
+      
+      // Hide empty league sections
+      document.querySelectorAll('.league-section').forEach(section => {
+        const visibleTeams = section.querySelectorAll('.team-btn:not(.hidden)').length;
+        section.style.display = visibleTeams === 0 ? 'none' : 'block';
+      });
+    }
+    
     function getStreamLink(url) {
       const browser = localStorage.getItem('gamewatch_browser') || 'default';
       
-      // Browser-specific URL schemes (work on desktop, may not work on all mobile)
-      const browserSchemes = {
-        'chrome': `googlechrome://navigate?url=${encodeURIComponent(url)}`,
-        'firefox': `firefox://open-url?url=${encodeURIComponent(url)}`,
-        'safari': url, // Safari doesn't have a custom scheme
-        'brave': `brave://open-url?url=${encodeURIComponent(url)}`,
-        'edge': `microsoft-edge:${url}`,
-        'default': url
+      // Detect if Android
+      const isAndroid = /Android/i.test(navigator.userAgent);
+      
+      if (!isAndroid || browser === 'default') {
+        // iOS and default just use regular URL
+        return url;
+      }
+      
+      // Android intent URLs
+      const androidIntents = {
+        'chrome': `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.android.chrome;end`,
+        'firefox': `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=org.mozilla.firefox;end`,
+        'brave': `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.brave.browser;end`,
+        'edge': `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.microsoft.emmx;end`,
+        'samsung': `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.sec.android.app.sbrowser;end`,
+        'opera': `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.opera.browser;end`
       };
       
-      return browserSchemes[browser] || url;
+      return androidIntents[browser] || url;
+    }
+    
+    function openStream(url) {
+      const link = getStreamLink(url);
+      window.open(link, '_blank');
     }
     
     // Refresh games every minute
