@@ -132,8 +132,25 @@
       align-items: center;
       gap: 10px;
       margin-bottom: 12px;
-      padding-bottom: 8px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 12px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.2s;
+    }
+    
+    .league-header:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+    
+    .league-header .collapse-icon {
+      margin-left: auto;
+      transition: transform 0.3s;
+    }
+    
+    .league-header.collapsed .collapse-icon {
+      transform: rotate(-90deg);
     }
     
     .league-logo {
@@ -149,6 +166,16 @@
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
       gap: 8px;
+      overflow: hidden;
+      transition: max-height 0.3s ease, opacity 0.3s ease, margin 0.3s ease;
+      max-height: 2000px;
+      opacity: 1;
+    }
+    
+    .teams-grid.collapsed {
+      max-height: 0;
+      opacity: 0;
+      margin-top: 0;
     }
     
     .team-btn {
@@ -231,6 +258,7 @@
     .game-league.nhl { background: rgba(0, 50, 160, 0.5); }
     .game-league.nba { background: rgba(200, 50, 50, 0.5); }
     .game-league.mlb { background: rgba(0, 80, 160, 0.5); }
+    .game-league.nfl { background: rgba(1, 51, 105, 0.5); }
     
     .game-status {
       display: inline-block;
@@ -383,6 +411,13 @@
       <p class="subtitle">Get notified when your teams play, with direct stream links</p>
     </header>
     
+    <div class="card">
+      <h2><span class="icon">📺</span> Upcoming Games</h2>
+      <div id="gamesContainer">
+        <div class="loading">Loading games...</div>
+      </div>
+    </div>
+    
     <div class="card ntfy-setup">
       <h2><span class="icon">🔔</span> Notification Setup</h2>
       <p class="ntfy-instructions">
@@ -434,14 +469,6 @@
         <div class="loading">Loading teams...</div>
       </div>
     </div>
-    
-    <div class="card">
-      <h2><span class="icon">📺</span> Upcoming Games</h2>
-      <div id="gamesContainer">
-        <div class="loading">Loading games...</div>
-      </div>
-    </div>
-  </div>
   
   <div class="save-indicator" id="saveIndicator">✓ Saved</div>
   
@@ -454,7 +481,8 @@
     const leagueInfo = {
       nhl: { name: 'NHL', icon: '🏒' },
       nba: { name: 'NBA', icon: '🏀' },
-      mlb: { name: 'MLB', icon: '⚾' }
+      mlb: { name: 'MLB', icon: '⚾' },
+      nfl: { name: 'NFL', icon: '🏈' }
     };
     
     async function init() {
@@ -479,6 +507,20 @@
       loadGames();
     }
     
+    // Track collapsed state
+    const collapsedLeagues = JSON.parse(localStorage.getItem('gamewatch_collapsed') || '{}');
+    
+    function toggleLeague(league) {
+      collapsedLeagues[league] = !collapsedLeagues[league];
+      localStorage.setItem('gamewatch_collapsed', JSON.stringify(collapsedLeagues));
+      
+      const header = document.querySelector(`[data-league-header="${league}"]`);
+      const grid = document.querySelector(`[data-league-grid="${league}"]`);
+      
+      header.classList.toggle('collapsed', collapsedLeagues[league]);
+      grid.classList.toggle('collapsed', collapsedLeagues[league]);
+    }
+    
     function renderTeams() {
       const container = document.getElementById('teamsContainer');
       container.innerHTML = '';
@@ -489,20 +531,22 @@
         
         const info = leagueInfo[league];
         const selectedTeams = userData.teams?.[league] || [];
+        const isCollapsed = collapsedLeagues[league];
         
         section.innerHTML = `
-          <div class="league-header">
+          <div class="league-header ${isCollapsed ? 'collapsed' : ''}" data-league-header="${league}" onclick="toggleLeague('${league}')">
             <span class="league-logo">${info.icon}</span>
             <span class="league-name">${info.name}</span>
             <span style="color: #666; font-size: 0.85rem;">(${selectedTeams.length} selected)</span>
+            <span class="collapse-icon">▼</span>
           </div>
-          <div class="teams-grid">
+          <div class="teams-grid ${isCollapsed ? 'collapsed' : ''}" data-league-grid="${league}">
             ${teams.map(team => `
               <button 
                 class="team-btn ${selectedTeams.includes(team.abbrev) ? 'selected' : ''}"
                 data-league="${league}"
                 data-abbrev="${team.abbrev}"
-                onclick="toggleTeam('${league}', '${team.abbrev}')"
+                onclick="event.stopPropagation(); toggleTeam('${league}', '${team.abbrev}')"
                 style="background: ${team.color || '#333'};"
               >
                 <span class="abbrev">${team.abbrev}</span>
