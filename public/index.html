@@ -70,13 +70,19 @@
     
     .ntfy-topic {
       display: flex;
-      align-items: center;
+      flex-direction: column;
       gap: 10px;
       margin: 15px 0;
     }
     
+    .ntfy-topic-row {
+      display: flex;
+      gap: 10px;
+    }
+    
     .ntfy-topic input {
       flex: 1;
+      min-width: 0;
       padding: 12px 16px;
       border-radius: 8px;
       border: 1px solid rgba(255, 255, 255, 0.2);
@@ -95,6 +101,7 @@
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
+      white-space: nowrap;
     }
     
     .ntfy-topic button:hover {
@@ -383,8 +390,10 @@
       </p>
       <div class="ntfy-topic">
         <label style="color: #888; font-size: 0.9rem;">Your topic:</label>
-        <input type="text" id="ntfyUrl" readonly placeholder="Loading...">
-        <button onclick="copyNtfyUrl()">Copy</button>
+        <div class="ntfy-topic-row">
+          <input type="text" id="ntfyUrl" readonly placeholder="Loading...">
+          <button onclick="copyNtfyUrl()">Copy</button>
+        </div>
       </div>
       <p class="ntfy-instructions">
         <ol>
@@ -625,14 +634,22 @@
       setTimeout(() => indicator.classList.remove('show'), 1500);
     }
     
-    function saveBrowserPreference() {
+    async function saveBrowserPreference() {
       const browser = document.getElementById('browserSelect').value;
       localStorage.setItem('gamewatch_browser', browser);
+      
+      // Also save to server for notifications
+      await fetch(`/api/user/${userId}/browser`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ browser })
+      });
+      
       showSaveIndicator();
     }
     
     function loadBrowserPreference() {
-      const browser = localStorage.getItem('gamewatch_browser') || 'default';
+      const browser = localStorage.getItem('gamewatch_browser') || userData?.browser || 'default';
       document.getElementById('browserSelect').value = browser;
     }
     
