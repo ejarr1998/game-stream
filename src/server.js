@@ -296,6 +296,7 @@ async function checkGamesAndNotify() {
   const games = await fetchAllGames();
   const users = loadUsers();
   const now = new Date();
+  const BASE_URL = process.env.BASE_URL || 'https://game-stream-production.up.railway.app';
   
   for (const game of games) {
     const gameKey = `${game.league}-${game.gameId}`;
@@ -320,10 +321,12 @@ async function checkGamesAndNotify() {
         
         if (homeTeamData && awayTeamData) {
           const streamUrl = buildStreamUrl(game.league, awayTeamData, homeTeamData);
+          // Use redirect URL so browser preference works
+          const redirectUrl = `${BASE_URL}/go/${userId}?url=${encodeURIComponent(streamUrl)}`;
           const title = `${game.league.toUpperCase()}: ${game.awayTeamName} @ ${game.homeTeamName}`;
           const message = isLive ? 'Game is LIVE now!' : 'Game starting soon!';
           
-          await sendNotification(user.ntfyTopic, title, message, streamUrl);
+          await sendNotification(user.ntfyTopic, title, message, redirectUrl);
         }
       }
     }
@@ -423,6 +426,21 @@ app.put('/api/user/:userId/teams', async (req, res) => {
   res.json({ success: true, teams });
 });
 
+// Update user browser preference
+app.put('/api/user/:userId/browser', (req, res) => {
+  const { userId } = req.params;
+  const { browser } = req.body;
+  const users = loadUsers();
+  
+  if (!users[userId]) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+  
+  users[userId].browser = browser || 'default';
+  saveUsers(users);
+  res.json({ success: true, browser: users[userId].browser });
+});
+
 // Get user data
 app.get('/api/user/:userId', (req, res) => {
   const { userId } = req.params;
@@ -494,6 +512,92 @@ app.get('/watch/:league/:gameId', async (req, res) => {
   
   const streamUrl = buildStreamUrl(league, awayTeamData, homeTeamData);
   res.redirect(streamUrl);
+});
+
+// Smart redirect - uses user's browser preference on Android, default on iOS
+app.get('/go/:userId', (req, res) => {
+  const { userId } = req.params;
+  const { url } = req.query;
+  
+  if (!url) {
+    return res.status(400).send('Missing url parameter');
+  }
+  
+  const users = loadUsers();
+  const user = users[userId];
+  const browser = user?.browser || 'default';
+  
+  // Serve a page that detects Android and redirects appropriately
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Redirecting...</title>
+  <style>
+    body {
+      background: #1a1a2e;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .loading {
+      text-align: center;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255,255,255,0.2);
+      border-top-color: #00d4ff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="loading">
+    <div class="spinner"></div>
+    <p>Opening stream...</p>
+  </div>
+  <script>
+    const url = ${JSON.stringify(url)};
+    const browser = ${JSON.stringify(browser)};
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    
+    if (isAndroid && browser !== 'default') {
+      const intents = {
+        'chrome': 'intent://' + url.replace(/^https?:\\/\\//, '') + '#Intent;scheme=https;package=com.android.chrome;end',
+        'firefox': 'intent://' + url.replace(/^https?:\\/\\//, '') + '#Intent;scheme=https;package=org.mozilla.firefox;end',
+        'brave': 'intent://' + url.replace(/^https?:\\/\\//, '') + '#Intent;scheme=https;package=com.brave.browser;end',
+        'edge': 'intent://' + url.replace(/^https?:\\/\\//, '') + '#Intent;scheme=https;package=com.microsoft.emmx;end',
+        'samsung': 'intent://' + url.replace(/^https?:\\/\\//, '') + '#Intent;scheme=https;package=com.sec.android.app.sbrowser;end',
+        'opera': 'intent://' + url.replace(/^https?:\\/\\//, '') + '#Intent;scheme=https;package=com.opera.browser;end'
+      };
+      
+      if (intents[browser]) {
+        window.location.href = intents[browser];
+      } else {
+        window.location.href = url;
+      }
+    } else {
+      // iOS or default - just redirect
+      window.location.href = url;
+    }
+  </script>
+</body>
+</html>
+  `;
+  
+  res.send(html);
 });
 
 // Test notification endpoint
