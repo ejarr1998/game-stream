@@ -3,10 +3,38 @@ const cron = require('node-cron');
 const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const sharp = require('sharp');
 
 const app = express();
 app.use(express.json());
 app.use(express.static('public'));
+
+// Generate PWA icons from SVG if they don't exist
+async function generateIcons() {
+  const iconsDir = path.join(__dirname, '../public/icons');
+  const svgPath = path.join(iconsDir, 'icon.svg');
+  const sizes = [192, 512];
+  
+  for (const size of sizes) {
+    const pngPath = path.join(iconsDir, `icon-${size}.png`);
+    
+    if (!fs.existsSync(pngPath)) {
+      try {
+        console.log(`Generating ${size}x${size} icon...`);
+        await sharp(svgPath)
+          .resize(size, size)
+          .png()
+          .toFile(pngPath);
+        console.log(`Created icon-${size}.png`);
+      } catch (err) {
+        console.error(`Error generating ${size}x${size} icon:`, err);
+      }
+    }
+  }
+}
+
+// Generate icons on startup
+generateIcons();
 
 // Data storage path - use persistent volume on Railway
 const DATA_DIR = process.env.DATA_DIR || './data';
