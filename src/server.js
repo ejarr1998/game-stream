@@ -8,6 +8,9 @@ const app = express();
 app.use(express.json());
 app.use(express.static('public'));
 
+// Generate icons on startup
+require('./generate-icons');
+
 // Data storage path - use persistent volume on Railway
 const DATA_DIR = process.env.DATA_DIR || './data';
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
