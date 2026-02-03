@@ -4,6 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GameWatch - Sports Stream Notifications</title>
+  
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#00d4ff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="GameWatch">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  
   <style>
     * {
       box-sizing: border-box;
@@ -41,6 +50,24 @@
     .subtitle {
       color: #888;
       font-size: 1.1rem;
+    }
+    
+    .install-btn {
+      margin-top: 15px;
+      padding: 12px 24px;
+      border-radius: 8px;
+      border: none;
+      background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .install-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4);
     }
     
     .card {
@@ -132,6 +159,16 @@
       color: #00d4ff;
     }
     
+    .ntfy-note {
+      font-size: 0.85rem;
+      color: #ffb800;
+      background: rgba(255, 184, 0, 0.1);
+      border: 1px solid rgba(255, 184, 0, 0.3);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin: 15px 0;
+    }
+    
     .league-section {
       margin-bottom: 20px;
     }
@@ -175,16 +212,14 @@
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
       gap: 8px;
-      overflow: hidden;
       transition: max-height 0.3s ease, opacity 0.3s ease, margin 0.3s ease;
-      max-height: 2000px;
-      opacity: 1;
     }
     
     .teams-grid.collapsed {
       max-height: 0;
       opacity: 0;
       margin-top: 0;
+      overflow: hidden;
     }
     
     .team-btn {
@@ -459,10 +494,7 @@
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
       gap: 8px;
-      overflow: hidden;
       transition: max-height 0.3s ease, opacity 0.3s ease;
-      max-height: 2000px;
-      opacity: 1;
       margin-bottom: 15px;
     }
     
@@ -470,6 +502,7 @@
       max-height: 0;
       opacity: 0;
       margin-bottom: 0;
+      overflow: hidden;
     }
     
     .no-teams-msg {
@@ -486,6 +519,9 @@
     <header>
       <h1>🏟️ GameWatch</h1>
       <p class="subtitle">Get notified when your teams play, with direct stream links</p>
+      <button id="installBtn" class="install-btn" onclick="installApp()" style="display: none;">
+        📲 Install App
+      </button>
     </header>
     
     <div class="card live-card" id="liveGamesCard" style="display: none;">
@@ -516,10 +552,12 @@
       <p class="ntfy-instructions">
         <ol>
           <li>Install the <a href="https://ntfy.sh" target="_blank">ntfy app</a> on your phone</li>
-          <li>Tap "+" and enter the topic name (just the part after ntfy.sh/)</li>
+          <li>Tap "+" and enter the topic name above</li>
+          <li>Tap the <strong>⚡ lightning bolt</strong> icon to enable instant delivery</li>
           <li>You'll get notifications with stream links when your games start!</li>
         </ol>
       </p>
+      <p class="ntfy-note">⚡ <strong>Important:</strong> Without instant delivery enabled, notifications may be delayed or not appear on your lock screen.</p>
       <button class="test-btn" onclick="testNotification()">Send Test Notification</button>
     </div>
     
@@ -932,6 +970,35 @@
     // Initialize
     init();
     loadBrowserPreference();
+    
+    // Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => console.log('Service worker registered'))
+        .catch((err) => console.log('Service worker registration failed:', err));
+    }
+    
+    // Handle PWA install prompt
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      // Show install button
+      document.getElementById('installBtn').style.display = 'block';
+    });
+    
+    function installApp() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            console.log('User accepted install');
+          }
+          deferredPrompt = null;
+          document.getElementById('installBtn').style.display = 'none';
+        });
+      }
+    }
   </script>
 </body>
 </html>
