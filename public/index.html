@@ -664,18 +664,16 @@
       });
     }
     
-    function getStreamLink(url) {
+    function openStream(url) {
       const browser = localStorage.getItem('gamewatch_browser') || 'default';
-      
-      // Detect if Android
       const isAndroid = /Android/i.test(navigator.userAgent);
       
       if (!isAndroid || browser === 'default') {
-        // iOS and default just use regular URL
-        return url;
+        window.open(url, '_blank');
+        return;
       }
       
-      // Android intent URLs
+      // Android intent URLs - must use location.href, not window.open
       const androidIntents = {
         'chrome': `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.android.chrome;end`,
         'firefox': `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=org.mozilla.firefox;end`,
@@ -685,12 +683,12 @@
         'opera': `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.opera.browser;end`
       };
       
-      return androidIntents[browser] || url;
-    }
-    
-    function openStream(url) {
-      const link = getStreamLink(url);
-      window.open(link, '_blank');
+      const intentUrl = androidIntents[browser];
+      if (intentUrl) {
+        window.location.href = intentUrl;
+      } else {
+        window.open(url, '_blank');
+      }
     }
     
     // Refresh games every minute
