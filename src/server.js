@@ -132,6 +132,40 @@ const TEAMS = {
     { abbrev: 'TEX', name: 'Texas Rangers', city: 'Texas', streamName: 'texas-rangers', color: '#003278' },
     { abbrev: 'TOR', name: 'Toronto Blue Jays', city: 'Toronto', streamName: 'toronto-blue-jays', color: '#134A8E' },
     { abbrev: 'WSN', name: 'Washington Nationals', city: 'Washington', streamName: 'washington-nationals', color: '#AB0003' }
+  ],
+  nfl: [
+    { abbrev: 'ARI', name: 'Arizona Cardinals', city: 'Arizona', streamName: 'arizona-cardinals', color: '#97233F' },
+    { abbrev: 'ATL', name: 'Atlanta Falcons', city: 'Atlanta', streamName: 'atlanta-falcons', color: '#A71930' },
+    { abbrev: 'BAL', name: 'Baltimore Ravens', city: 'Baltimore', streamName: 'baltimore-ravens', color: '#241773' },
+    { abbrev: 'BUF', name: 'Buffalo Bills', city: 'Buffalo', streamName: 'buffalo-bills', color: '#00338D' },
+    { abbrev: 'CAR', name: 'Carolina Panthers', city: 'Carolina', streamName: 'carolina-panthers', color: '#0085CA' },
+    { abbrev: 'CHI', name: 'Chicago Bears', city: 'Chicago', streamName: 'chicago-bears', color: '#0B162A' },
+    { abbrev: 'CIN', name: 'Cincinnati Bengals', city: 'Cincinnati', streamName: 'cincinnati-bengals', color: '#FB4F14' },
+    { abbrev: 'CLE', name: 'Cleveland Browns', city: 'Cleveland', streamName: 'cleveland-browns', color: '#311D00' },
+    { abbrev: 'DAL', name: 'Dallas Cowboys', city: 'Dallas', streamName: 'dallas-cowboys', color: '#003594' },
+    { abbrev: 'DEN', name: 'Denver Broncos', city: 'Denver', streamName: 'denver-broncos', color: '#FB4F14' },
+    { abbrev: 'DET', name: 'Detroit Lions', city: 'Detroit', streamName: 'detroit-lions', color: '#0076B6' },
+    { abbrev: 'GB', name: 'Green Bay Packers', city: 'Green Bay', streamName: 'green-bay-packers', color: '#203731' },
+    { abbrev: 'HOU', name: 'Houston Texans', city: 'Houston', streamName: 'houston-texans', color: '#03202F' },
+    { abbrev: 'IND', name: 'Indianapolis Colts', city: 'Indianapolis', streamName: 'indianapolis-colts', color: '#002C5F' },
+    { abbrev: 'JAX', name: 'Jacksonville Jaguars', city: 'Jacksonville', streamName: 'jacksonville-jaguars', color: '#006778' },
+    { abbrev: 'KC', name: 'Kansas City Chiefs', city: 'Kansas City', streamName: 'kansas-city-chiefs', color: '#E31837' },
+    { abbrev: 'LV', name: 'Las Vegas Raiders', city: 'Las Vegas', streamName: 'las-vegas-raiders', color: '#000000' },
+    { abbrev: 'LAC', name: 'Los Angeles Chargers', city: 'Los Angeles', streamName: 'los-angeles-chargers', color: '#0080C6' },
+    { abbrev: 'LAR', name: 'Los Angeles Rams', city: 'Los Angeles', streamName: 'los-angeles-rams', color: '#003594' },
+    { abbrev: 'MIA', name: 'Miami Dolphins', city: 'Miami', streamName: 'miami-dolphins', color: '#008E97' },
+    { abbrev: 'MIN', name: 'Minnesota Vikings', city: 'Minnesota', streamName: 'minnesota-vikings', color: '#4F2683' },
+    { abbrev: 'NE', name: 'New England Patriots', city: 'New England', streamName: 'new-england-patriots', color: '#002244' },
+    { abbrev: 'NO', name: 'New Orleans Saints', city: 'New Orleans', streamName: 'new-orleans-saints', color: '#D3BC8D' },
+    { abbrev: 'NYG', name: 'New York Giants', city: 'New York', streamName: 'new-york-giants', color: '#0B2265' },
+    { abbrev: 'NYJ', name: 'New York Jets', city: 'New York', streamName: 'new-york-jets', color: '#125740' },
+    { abbrev: 'PHI', name: 'Philadelphia Eagles', city: 'Philadelphia', streamName: 'philadelphia-eagles', color: '#004C54' },
+    { abbrev: 'PIT', name: 'Pittsburgh Steelers', city: 'Pittsburgh', streamName: 'pittsburgh-steelers', color: '#FFB612' },
+    { abbrev: 'SF', name: 'San Francisco 49ers', city: 'San Francisco', streamName: 'san-francisco-49ers', color: '#AA0000' },
+    { abbrev: 'SEA', name: 'Seattle Seahawks', city: 'Seattle', streamName: 'seattle-seahawks', color: '#002244' },
+    { abbrev: 'TB', name: 'Tampa Bay Buccaneers', city: 'Tampa Bay', streamName: 'tampa-bay-buccaneers', color: '#D50A0A' },
+    { abbrev: 'TEN', name: 'Tennessee Titans', city: 'Tennessee', streamName: 'tennessee-titans', color: '#0C2340' },
+    { abbrev: 'WAS', name: 'Washington Commanders', city: 'Washington', streamName: 'washington-commanders', color: '#5A1414' }
   ]
 };
 
@@ -239,13 +273,45 @@ async function fetchMLBGames() {
   }
 }
 
+async function fetchNFLGames() {
+  try {
+    const response = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard`);
+    const data = await response.json();
+    const games = [];
+    
+    for (const event of data.events || []) {
+      const competition = event.competitions?.[0];
+      if (!competition) continue;
+      
+      const homeTeam = competition.competitors?.find(c => c.homeAway === 'home');
+      const awayTeam = competition.competitors?.find(c => c.homeAway === 'away');
+      
+      games.push({
+        league: 'nfl',
+        gameId: event.id,
+        startTime: new Date(event.date),
+        homeTeam: homeTeam?.team?.abbreviation,
+        awayTeam: awayTeam?.team?.abbreviation,
+        homeTeamName: homeTeam?.team?.displayName,
+        awayTeamName: awayTeam?.team?.displayName,
+        state: event.status?.type?.name
+      });
+    }
+    return games;
+  } catch (err) {
+    console.error('Error fetching NFL games:', err);
+    return [];
+  }
+}
+
 async function fetchAllGames() {
-  const [nhl, nba, mlb] = await Promise.all([
+  const [nhl, nba, mlb, nfl] = await Promise.all([
     fetchNHLGames(),
     fetchNBAGames(),
-    fetchMLBGames()
+    fetchMLBGames(),
+    fetchNFLGames()
   ]);
-  return [...nhl, ...nba, ...mlb];
+  return [...nhl, ...nba, ...mlb, ...nfl];
 }
 
 // Track which games we've already notified about
