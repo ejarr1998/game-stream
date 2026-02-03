@@ -51,6 +51,15 @@
       border: 1px solid rgba(255, 255, 255, 0.1);
     }
     
+    .card.live-card {
+      background: rgba(255, 0, 0, 0.08);
+      border: 1px solid rgba(255, 0, 0, 0.3);
+    }
+    
+    .card.live-card h2 {
+      color: #ff4444;
+    }
+    
     .card h2 {
       font-size: 1.3rem;
       margin-bottom: 16px;
@@ -236,6 +245,11 @@
       background: rgba(255, 255, 255, 0.03);
       border-radius: 12px;
       border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    
+    .game-card.live {
+      background: rgba(255, 0, 0, 0.05);
+      border: 1px solid rgba(255, 0, 0, 0.2);
     }
     
     .game-info {
@@ -474,9 +488,15 @@
       <p class="subtitle">Get notified when your teams play, with direct stream links</p>
     </header>
     
+    <div class="card live-card" id="liveGamesCard" style="display: none;">
+      <h2><span class="icon">🔴</span> Live Now</h2>
+      <div id="liveGamesContainer">
+      </div>
+    </div>
+    
     <div class="card">
-      <h2><span class="icon">📺</span> Upcoming Games</h2>
-      <div id="gamesContainer">
+      <h2><span class="icon">📅</span> Upcoming Games</h2>
+      <div id="upcomingGamesContainer">
         <div class="loading">Loading games...</div>
       </div>
     </div>
@@ -720,58 +740,83 @@
     }
     
     async function loadGames() {
-      const container = document.getElementById('gamesContainer');
+      const liveContainer = document.getElementById('liveGamesContainer');
+      const upcomingContainer = document.getElementById('upcomingGamesContainer');
+      const liveCard = document.getElementById('liveGamesCard');
       
       try {
         const response = await fetch(`/api/games/${userId}`);
         const games = await response.json();
         
-        if (games.length === 0) {
-          container.innerHTML = `
-            <div class="no-games">
-              <p>No upcoming games for your teams in the next 24 hours.</p>
-              <p style="margin-top: 10px; font-size: 0.85rem;">Select some teams above to get started!</p>
-            </div>
-          `;
-          return;
-        }
+        // Split into live and upcoming
+        const liveGames = games.filter(g => 
+          g.state === 'LIVE' || g.state === 'STATUS_IN_PROGRESS'
+        );
+        const upcomingGames = games.filter(g => 
+          g.state !== 'LIVE' && g.state !== 'STATUS_IN_PROGRESS' && 
+          g.state !== 'FINAL' && g.state !== 'STATUS_FINAL'
+        );
         
         // Sort by start time
-        games.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+        liveGames.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+        upcomingGames.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
         
-        container.innerHTML = `
-          <div class="games-list">
-            ${games.map(game => {
-              const startTime = new Date(game.startTime);
-              const isLive = game.state === 'LIVE' || game.state === 'STATUS_IN_PROGRESS';
-              const timeStr = isLive ? 'LIVE' : startTime.toLocaleString([], { 
-                weekday: 'short',
-                hour: 'numeric', 
-                minute: '2-digit'
-              });
-              
-              return `
-                <div class="game-card">
-                  <div class="game-info">
-                    <div class="game-teams">${game.awayTeamName} @ ${game.homeTeamName}</div>
-                    <div class="game-meta">
-                      <span class="game-league ${game.league}">${game.league.toUpperCase()}</span>
-                      ${isLive ? '<span class="game-status live">● LIVE</span>' : timeStr}
-                    </div>
-                  </div>
-                  ${game.streamUrl ? `
-                    <a href="${game.streamUrl}" onclick="event.preventDefault(); openStream('${game.streamUrl}');" class="watch-btn">
-                      Watch
-                    </a>
-                  ` : ''}
-                </div>
-              `;
-            }).join('')}
-          </div>
-        `;
+        // Show/hide live card
+        if (liveGames.length > 0) {
+          liveCard.style.display = 'block';
+          liveContainer.innerHTML = `
+            <div class="games-list">
+              ${liveGames.map(game => renderGameCard(game, true)).join('')}
+            </div>
+          `;
+        } else {
+          liveCard.style.display = 'none';
+        }
+        
+        // Render upcoming
+        if (upcomingGames.length === 0) {
+          upcomingContainer.innerHTML = `
+            <div class="no-games">
+              <p>No upcoming games for your teams in the next 24 hours.</p>
+              <p style="margin-top: 10px; font-size: 0.85rem;">Select some teams below to get started!</p>
+            </div>
+          `;
+        } else {
+          upcomingContainer.innerHTML = `
+            <div class="games-list">
+              ${upcomingGames.map(game => renderGameCard(game, false)).join('')}
+            </div>
+          `;
+        }
       } catch (err) {
-        container.innerHTML = `<div class="no-games">Error loading games</div>`;
+        upcomingContainer.innerHTML = `<div class="no-games">Error loading games</div>`;
       }
+    }
+    
+    function renderGameCard(game, isLive) {
+      const startTime = new Date(game.startTime);
+      const timeStr = startTime.toLocaleString([], { 
+        weekday: 'short',
+        hour: 'numeric', 
+        minute: '2-digit'
+      });
+      
+      return `
+        <div class="game-card ${isLive ? 'live' : ''}">
+          <div class="game-info">
+            <div class="game-teams">${game.awayTeamName} @ ${game.homeTeamName}</div>
+            <div class="game-meta">
+              <span class="game-league ${game.league}">${game.league.toUpperCase()}</span>
+              ${isLive ? '<span class="game-status live">● LIVE</span>' : timeStr}
+            </div>
+          </div>
+          ${game.streamUrl ? `
+            <a href="${game.streamUrl}" onclick="event.preventDefault(); openStream('${game.streamUrl}');" class="watch-btn">
+              Watch
+            </a>
+          ` : ''}
+        </div>
+      `;
     }
     
     function copyNtfyUrl() {
