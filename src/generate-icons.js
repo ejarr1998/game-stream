@@ -2,88 +2,109 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
-function createPNG(size) {
-  const signature = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
-  
-  const width = size;
-  const height = size;
-  const ihdrData = Buffer.alloc(13);
-  ihdrData.writeUInt32BE(width, 0);
-  ihdrData.writeUInt32BE(height, 4);
-  ihdrData.writeUInt8(8, 8);
-  ihdrData.writeUInt8(2, 9);
-  ihdrData.writeUInt8(0, 10);
-  ihdrData.writeUInt8(0, 11);
-  ihdrData.writeUInt8(0, 12);
-  const ihdr = createChunk('IHDR', ihdrData);
-  
-  const rawData = [];
-  const cx = size / 2;
-  const cy = size / 2;
-  const radius = size * 0.2;
-  
-  for (let y = 0; y < height; y++) {
-    rawData.push(0);
-    for (let x = 0; x < width; x++) {
-      let r = 0x1a, g = 0x1a, b = 0x2e;
-      
-      const dx = x - cx;
-      const dy = y - cy;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      
-      if (dist < radius * 1.5) {
-        r = 0x7b; g = 0x2c; b = 0xbf;
-      }
-      
-      if (x >= cx - radius * 0.3 && x <= cx + radius * 0.5) {
-        const relY = (y - cy) / radius;
-        const maxX = cx + radius * 0.5 - Math.abs(relY) * radius * 0.8;
-        const minX = cx - radius * 0.3;
-        if (x >= minX && x <= maxX && Math.abs(relY) < 0.6) {
-          r = 0xff; g = 0xff; b = 0xff;
-        }
-      }
-      
-      const ringDist = Math.abs(dist - radius * 2.5);
-      if (ringDist < size * 0.03) {
-        r = 0x00; g = 0xd4; b = 0xff;
-      }
-      
-      rawData.push(r, g, b);
-    }
-  }
-  
-  const compressed = zlib.deflateSync(Buffer.from(rawData));
-  const idat = createChunk('IDAT', compressed);
-  const iend = createChunk('IEND', Buffer.alloc(0));
+function createValidPNG(size) {
+  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  const ihdr = createIHDR(size, size);
+  const imageData = createImageData(size);
+  const idat = createIDAT(imageData);
+  const iend = createIEND();
   
   return Buffer.concat([signature, ihdr, idat, iend]);
 }
 
-function createChunk(type, data) {
+function createIHDR(width, height) {
+  const data = Buffer.alloc(13);
+  data.writeUInt32BE(width, 0);
+  data.writeUInt32BE(height, 4);
+  data.writeUInt8(8, 8);   // bit depth
+  data.writeUInt8(6, 9);   // color type (RGBA)
+  data.writeUInt8(0, 10);  // compression
+  data.writeUInt8(0, 11);  // filter
+  data.writeUInt8(0, 12);  // interlace
+  
+  return wrapChunk('IHDR', data);
+}
+
+function createImageData(size) {
+  const rows = [];
+  const cx = size / 2;
+  const cy = size / 2;
+  const outerRadius = size * 0.35;
+  const innerRadius = size * 0.15;
+  
+  for (let y = 0; y < size; y++) {
+    const row = [0];
+    for (let x = 0; x < size; x++) {
+      const dx = x - cx;
+      const dy = y - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      let r = 0x1a, g = 0x1a, b = 0x2e, a = 255;
+      
+      if (dist > outerRadius - 8 && dist < outerRadius + 8) {
+        r = 0x00; g = 0xd4; b = 0xff;
+      }
+      
+      if (dist < innerRadius) {
+        r = 0x7b; g = 0x2c; b = 0xbf;
+      }
+      
+      if (dist < innerRadius * 0.7) {
+        const relX = (x - cx) / innerRadius;
+        const relY = (y - cy) / innerRadius;
+        if (relX > -0.3 && relX < 0.4 && Math.abs(relY) < (0.4 - relX) * 0.8) {
+          r = 255; g = 255; b = 255;
+        }
+      }
+      
+      row.push(r, g, b, a);
+    }
+    rows.push(Buffer.from(row));
+  }
+  
+  return Buffer.concat(rows);
+}
+
+function createIDAT(data) {
+  const compressed = zlib.deflateSync(data, { level: 9 });
+  return wrapChunk('IDAT', compressed);
+}
+
+function createIEND() {
+  return wrapChunk('IEND', Buffer.alloc(0));
+}
+
+function wrapChunk(type, data) {
+  const typeBytes = Buffer.from(type, 'ascii');
   const length = Buffer.alloc(4);
   length.writeUInt32BE(data.length, 0);
-  const typeBuffer = Buffer.from(type);
-  const crcData = Buffer.concat([typeBuffer, data]);
-  const crc = crc32(crcData);
-  const crcBuffer = Buffer.alloc(4);
-  crcBuffer.writeUInt32BE(crc >>> 0, 0);
-  return Buffer.concat([length, typeBuffer, data, crcBuffer]);
+  
+  const crcInput = Buffer.concat([typeBytes, data]);
+  const crc = crc32(crcInput);
+  const crcBytes = Buffer.alloc(4);
+  crcBytes.writeUInt32BE(crc, 0);
+  
+  return Buffer.concat([length, typeBytes, data, crcBytes]);
 }
 
 function crc32(buf) {
-  let crc = 0xffffffff;
-  for (let i = 0; i < buf.length; i++) {
-    crc ^= buf[i];
-    for (let j = 0; j < 8; j++) {
-      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
-    }
+  let c = 0xffffffff;
+  for (let n = 0; n < buf.length; n++) {
+    c = crcTable[(c ^ buf[n]) & 0xff] ^ (c >>> 8);
   }
-  return crc ^ 0xffffffff;
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+const crcTable = [];
+for (let n = 0; n < 256; n++) {
+  let c = n;
+  for (let k = 0; k < 8; k++) {
+    c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+  }
+  crcTable[n] = c;
 }
 
 const iconsDir = path.join(__dirname, '../public/icons');
-
 if (!fs.existsSync(iconsDir)) {
   fs.mkdirSync(iconsDir, { recursive: true });
 }
@@ -92,7 +113,7 @@ if (!fs.existsSync(iconsDir)) {
   const pngPath = path.join(iconsDir, `icon-${size}.png`);
   if (!fs.existsSync(pngPath)) {
     console.log(`Generating ${size}x${size} icon...`);
-    const png = createPNG(size);
+    const png = createValidPNG(size);
     fs.writeFileSync(pngPath, png);
     console.log(`Created icon-${size}.png`);
   }
