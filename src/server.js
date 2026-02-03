@@ -370,7 +370,7 @@ app.post('/api/user', (req, res) => {
 });
 
 // Update user teams
-app.put('/api/user/:userId/teams', (req, res) => {
+app.put('/api/user/:userId/teams', async (req, res) => {
   const { userId } = req.params;
   const { teams } = req.body;
   const users = loadUsers();
@@ -379,8 +379,48 @@ app.put('/api/user/:userId/teams', (req, res) => {
     return res.status(404).json({ error: 'User not found' });
   }
   
+  // Find newly added teams
+  const oldTeams = users[userId].teams || {};
+  const newlyAdded = {};
+  
+  for (const league of Object.keys(teams)) {
+    const oldLeagueTeams = oldTeams[league] || [];
+    const newLeagueTeams = teams[league] || [];
+    const added = newLeagueTeams.filter(t => !oldLeagueTeams.includes(t));
+    if (added.length > 0) {
+      newlyAdded[league] = added;
+    }
+  }
+  
+  // Save the updated teams
   users[userId].teams = teams;
   saveUsers(users);
+  
+  // Check for live games with newly added teams
+  if (Object.keys(newlyAdded).length > 0) {
+    const allGames = await fetchAllGames();
+    
+    for (const game of allGames) {
+      const isLive = game.state === 'LIVE' || game.state === 'STATUS_IN_PROGRESS';
+      if (!isLive) continue;
+      
+      const addedInLeague = newlyAdded[game.league] || [];
+      const isNewlyFollowed = addedInLeague.includes(game.homeTeam) || addedInLeague.includes(game.awayTeam);
+      
+      if (isNewlyFollowed) {
+        const homeTeamData = getTeamByAbbrev(game.league, game.homeTeam);
+        const awayTeamData = getTeamByAbbrev(game.league, game.awayTeam);
+        
+        if (homeTeamData && awayTeamData) {
+          const streamUrl = buildStreamUrl(game.league, awayTeamData, homeTeamData);
+          const title = `${game.league.toUpperCase()}: ${game.awayTeamName} @ ${game.homeTeamName}`;
+          
+          await sendNotification(users[userId].ntfyTopic, title, 'Game is LIVE now!', streamUrl);
+        }
+      }
+    }
+  }
+  
   res.json({ success: true, teams });
 });
 
