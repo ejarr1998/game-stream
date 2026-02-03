@@ -147,32 +147,38 @@
     .team-btn {
       padding: 10px 12px;
       border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      border: 2px solid rgba(255, 255, 255, 0.15);
       background: rgba(255, 255, 255, 0.05);
-      color: #ccc;
+      color: #fff;
       font-size: 0.85rem;
       cursor: pointer;
       transition: all 0.2s;
-      text-align: left;
+      text-align: center;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      position: relative;
     }
     
     .team-btn:hover {
-      background: rgba(255, 255, 255, 0.1);
-      border-color: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
     
     .team-btn.selected {
-      background: rgba(0, 212, 255, 0.2);
-      border-color: #00d4ff;
-      color: #00d4ff;
+      border-color: #fff;
+      box-shadow: 0 0 12px rgba(255, 255, 255, 0.3);
     }
     
     .team-btn .abbrev {
       font-weight: 700;
-      margin-right: 6px;
+      display: block;
+      font-size: 1.1rem;
+    }
+    
+    .team-btn .city {
+      font-size: 0.7rem;
+      opacity: 0.9;
     }
     
     .games-list {
@@ -302,6 +308,38 @@
       opacity: 1;
       transform: translateY(0);
     }
+    
+    .setting-row {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin: 15px 0;
+    }
+    
+    .setting-row label {
+      font-size: 0.95rem;
+    }
+    
+    .setting-row select {
+      padding: 10px 15px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(0, 0, 0, 0.3);
+      color: #fff;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+    
+    .setting-row select option {
+      background: #1a1a2e;
+      color: #fff;
+    }
+    
+    .setting-note {
+      font-size: 0.8rem;
+      color: #666;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
@@ -323,11 +361,27 @@
       <p class="ntfy-instructions">
         <ol>
           <li>Install the <a href="https://ntfy.sh" target="_blank">ntfy app</a> on your phone</li>
-          <li>Tap "+" and paste the URL above to subscribe</li>
+          <li>Tap "+" and enter the topic name (just the part after ntfy.sh/)</li>
           <li>You'll get notifications with stream links when your games start!</li>
         </ol>
       </p>
       <button class="test-btn" onclick="testNotification()">Send Test Notification</button>
+    </div>
+    
+    <div class="card">
+      <h2><span class="icon">⚙️</span> Settings</h2>
+      <div class="setting-row">
+        <label for="browserSelect">Open streams in:</label>
+        <select id="browserSelect" onchange="saveBrowserPreference()">
+          <option value="default">Default Browser</option>
+          <option value="chrome">Chrome</option>
+          <option value="firefox">Firefox</option>
+          <option value="safari">Safari</option>
+          <option value="brave">Brave</option>
+          <option value="edge">Edge</option>
+        </select>
+      </div>
+      <p class="setting-note">Note: Browser selection works best on desktop. On mobile, links open in your default browser.</p>
     </div>
     
     <div class="card">
@@ -408,8 +462,10 @@
                 data-league="${league}"
                 data-abbrev="${team.abbrev}"
                 onclick="toggleTeam('${league}', '${team.abbrev}')"
+                style="background: ${team.color || '#333'};"
               >
-                <span class="abbrev">${team.abbrev}</span>${team.city}
+                <span class="abbrev">${team.abbrev}</span>
+                <span class="city">${team.city}</span>
               </button>
             `).join('')}
           </div>
@@ -490,7 +546,7 @@
                     </div>
                   </div>
                   ${game.streamUrl ? `
-                    <a href="${game.streamUrl}" target="_blank" class="watch-btn">
+                    <a href="${game.streamUrl}" onclick="event.preventDefault(); window.open(getStreamLink('${game.streamUrl}'), '_blank');" class="watch-btn">
                       Watch
                     </a>
                   ` : ''}
@@ -537,11 +593,39 @@
       setTimeout(() => indicator.classList.remove('show'), 1500);
     }
     
+    function saveBrowserPreference() {
+      const browser = document.getElementById('browserSelect').value;
+      localStorage.setItem('gamewatch_browser', browser);
+      showSaveIndicator();
+    }
+    
+    function loadBrowserPreference() {
+      const browser = localStorage.getItem('gamewatch_browser') || 'default';
+      document.getElementById('browserSelect').value = browser;
+    }
+    
+    function getStreamLink(url) {
+      const browser = localStorage.getItem('gamewatch_browser') || 'default';
+      
+      // Browser-specific URL schemes (work on desktop, may not work on all mobile)
+      const browserSchemes = {
+        'chrome': `googlechrome://navigate?url=${encodeURIComponent(url)}`,
+        'firefox': `firefox://open-url?url=${encodeURIComponent(url)}`,
+        'safari': url, // Safari doesn't have a custom scheme
+        'brave': `brave://open-url?url=${encodeURIComponent(url)}`,
+        'edge': `microsoft-edge:${url}`,
+        'default': url
+      };
+      
+      return browserSchemes[browser] || url;
+    }
+    
     // Refresh games every minute
     setInterval(loadGames, 60000);
     
     // Initialize
     init();
+    loadBrowserPreference();
   </script>
 </body>
 </html>
