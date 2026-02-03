@@ -1,0 +1,10 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "npm start"
+restartPolicyType = "always"
+
+[[mounts]]
+source = "data"
+destination = "/app/data"
