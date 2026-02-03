@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GameWatch - Sports Stream Notifications</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      color: #fff;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+      background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .subtitle {
+      color: #888;
+      font-size: 1.1rem;
+    }
+    
+    .card {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .card h2 {
+      font-size: 1.3rem;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .card h2 .icon {
+      font-size: 1.5rem;
+    }
+    
+    .ntfy-setup {
+      background: rgba(0, 212, 255, 0.1);
+      border: 1px solid rgba(0, 212, 255, 0.3);
+    }
+    
+    .ntfy-topic {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 15px 0;
+    }
+    
+    .ntfy-topic input {
+      flex: 1;
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(0, 0, 0, 0.3);
+      color: #fff;
+      font-size: 1rem;
+      font-family: monospace;
+    }
+    
+    .ntfy-topic button {
+      padding: 12px 20px;
+      border-radius: 8px;
+      border: none;
+      background: #00d4ff;
+      color: #000;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .ntfy-topic button:hover {
+      background: #00b8e6;
+      transform: translateY(-1px);
+    }
+    
+    .ntfy-instructions {
+      font-size: 0.9rem;
+      color: #aaa;
+      line-height: 1.6;
+    }
+    
+    .ntfy-instructions ol {
+      margin: 10px 0 10px 20px;
+    }
+    
+    .ntfy-instructions a {
+      color: #00d4ff;
+    }
+    
+    .league-section {
+      margin-bottom: 20px;
+    }
+    
+    .league-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .league-logo {
+      font-size: 1.5rem;
+    }
+    
+    .league-name {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+    
+    .teams-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 8px;
+    }
+    
+    .team-btn {
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.05);
+      color: #ccc;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: left;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .team-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+    
+    .team-btn.selected {
+      background: rgba(0, 212, 255, 0.2);
+      border-color: #00d4ff;
+      color: #00d4ff;
+    }
+    
+    .team-btn .abbrev {
+      font-weight: 700;
+      margin-right: 6px;
+    }
+    
+    .games-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .game-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    
+    .game-info {
+      flex: 1;
+    }
+    
+    .game-teams {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    
+    .game-meta {
+      font-size: 0.85rem;
+      color: #888;
+    }
+    
+    .game-league {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-right: 8px;
+    }
+    
+    .game-league.nhl { background: rgba(0, 50, 160, 0.5); }
+    .game-league.nba { background: rgba(200, 50, 50, 0.5); }
+    .game-league.mlb { background: rgba(0, 80, 160, 0.5); }
+    
+    .game-status {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    
+    .game-status.live {
+      background: rgba(0, 200, 0, 0.3);
+      color: #0f0;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    
+    .watch-btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: none;
+      background: linear-gradient(90deg, #7b2cbf, #00d4ff);
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    
+    .watch-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+    }
+    
+    .no-games {
+      text-align: center;
+      color: #666;
+      padding: 40px;
+    }
+    
+    .test-btn {
+      margin-top: 10px;
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: transparent;
+      color: #888;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .test-btn:hover {
+      border-color: #00d4ff;
+      color: #00d4ff;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+    
+    .save-indicator {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 12px 24px;
+      background: rgba(0, 200, 0, 0.9);
+      color: #fff;
+      border-radius: 8px;
+      font-weight: 600;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.3s;
+    }
+    
+    .save-indicator.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🏟️ GameWatch</h1>
+      <p class="subtitle">Get notified when your teams play, with direct stream links</p>
+    </header>
+    
+    <div class="card ntfy-setup">
+      <h2><span class="icon">🔔</span> Notification Setup</h2>
+      <p class="ntfy-instructions">
+        Subscribe to your personal notification channel to get alerts when games start:
+      </p>
+      <div class="ntfy-topic">
+        <input type="text" id="ntfyUrl" readonly placeholder="Loading...">
+        <button onclick="copyNtfyUrl()">Copy</button>
+      </div>
+      <p class="ntfy-instructions">
+        <ol>
+          <li>Install the <a href="https://ntfy.sh" target="_blank">ntfy app</a> on your phone</li>
+          <li>Tap "+" and paste the URL above to subscribe</li>
+          <li>You'll get notifications with stream links when your games start!</li>
+        </ol>
+      </p>
+      <button class="test-btn" onclick="testNotification()">Send Test Notification</button>
+    </div>
+    
+    <div class="card">
+      <h2><span class="icon">⭐</span> Your Teams</h2>
+      <p style="color: #888; margin-bottom: 20px; font-size: 0.9rem;">
+        Select the teams you want to follow. You'll be notified when they play.
+      </p>
+      <div id="teamsContainer">
+        <div class="loading">Loading teams...</div>
+      </div>
+    </div>
+    
+    <div class="card">
+      <h2><span class="icon">📺</span> Upcoming Games</h2>
+      <div id="gamesContainer">
+        <div class="loading">Loading games...</div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="save-indicator" id="saveIndicator">✓ Saved</div>
+  
+  <script>
+    let userId = localStorage.getItem('gamewatch_userId');
+    let userData = null;
+    let allTeams = {};
+    
+    // League display info
+    const leagueInfo = {
+      nhl: { name: 'NHL', icon: '🏒' },
+      nba: { name: 'NBA', icon: '🏀' },
+      mlb: { name: 'MLB', icon: '⚾' }
+    };
+    
+    async function init() {
+      // Get or create user
+      const response = await fetch('/api/user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+      userData = await response.json();
+      userId = userData.userId;
+      localStorage.setItem('gamewatch_userId', userId);
+      
+      // Update ntfy URL
+      document.getElementById('ntfyUrl').value = `ntfy.sh/${userData.ntfyTopic}`;
+      
+      // Load teams
+      const teamsResponse = await fetch('/api/teams');
+      allTeams = await teamsResponse.json();
+      
+      renderTeams();
+      loadGames();
+    }
+    
+    function renderTeams() {
+      const container = document.getElementById('teamsContainer');
+      container.innerHTML = '';
+      
+      for (const [league, teams] of Object.entries(allTeams)) {
+        const section = document.createElement('div');
+        section.className = 'league-section';
+        
+        const info = leagueInfo[league];
+        const selectedTeams = userData.teams?.[league] || [];
+        
+        section.innerHTML = `
+          <div class="league-header">
+            <span class="league-logo">${info.icon}</span>
+            <span class="league-name">${info.name}</span>
+            <span style="color: #666; font-size: 0.85rem;">(${selectedTeams.length} selected)</span>
+          </div>
+          <div class="teams-grid">
+            ${teams.map(team => `
+              <button 
+                class="team-btn ${selectedTeams.includes(team.abbrev) ? 'selected' : ''}"
+                data-league="${league}"
+                data-abbrev="${team.abbrev}"
+                onclick="toggleTeam('${league}', '${team.abbrev}')"
+              >
+                <span class="abbrev">${team.abbrev}</span>${team.city}
+              </button>
+            `).join('')}
+          </div>
+        `;
+        
+        container.appendChild(section);
+      }
+    }
+    
+    async function toggleTeam(league, abbrev) {
+      if (!userData.teams[league]) {
+        userData.teams[league] = [];
+      }
+      
+      const idx = userData.teams[league].indexOf(abbrev);
+      if (idx === -1) {
+        userData.teams[league].push(abbrev);
+      } else {
+        userData.teams[league].splice(idx, 1);
+      }
+      
+      // Update UI immediately
+      const btn = document.querySelector(`[data-league="${league}"][data-abbrev="${abbrev}"]`);
+      btn.classList.toggle('selected');
+      
+      // Update count
+      renderTeams();
+      
+      // Save to server
+      await fetch(`/api/user/${userId}/teams`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teams: userData.teams })
+      });
+      
+      showSaveIndicator();
+      loadGames();
+    }
+    
+    async function loadGames() {
+      const container = document.getElementById('gamesContainer');
+      
+      try {
+        const response = await fetch(`/api/games/${userId}`);
+        const games = await response.json();
+        
+        if (games.length === 0) {
+          container.innerHTML = `
+            <div class="no-games">
+              <p>No upcoming games for your teams in the next 24 hours.</p>
+              <p style="margin-top: 10px; font-size: 0.85rem;">Select some teams above to get started!</p>
+            </div>
+          `;
+          return;
+        }
+        
+        // Sort by start time
+        games.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+        
+        container.innerHTML = `
+          <div class="games-list">
+            ${games.map(game => {
+              const startTime = new Date(game.startTime);
+              const isLive = game.state === 'LIVE' || game.state === 'STATUS_IN_PROGRESS';
+              const timeStr = isLive ? 'LIVE' : startTime.toLocaleString([], { 
+                weekday: 'short',
+                hour: 'numeric', 
+                minute: '2-digit'
+              });
+              
+              return `
+                <div class="game-card">
+                  <div class="game-info">
+                    <div class="game-teams">${game.awayTeamName} @ ${game.homeTeamName}</div>
+                    <div class="game-meta">
+                      <span class="game-league ${game.league}">${game.league.toUpperCase()}</span>
+                      ${isLive ? '<span class="game-status live">● LIVE</span>' : timeStr}
+                    </div>
+                  </div>
+                  ${game.streamUrl ? `
+                    <a href="${game.streamUrl}" target="_blank" class="watch-btn">
+                      Watch
+                    </a>
+                  ` : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      } catch (err) {
+        container.innerHTML = `<div class="no-games">Error loading games</div>`;
+      }
+    }
+    
+    function copyNtfyUrl() {
+      const input = document.getElementById('ntfyUrl');
+      navigator.clipboard.writeText(input.value);
+      
+      const btn = input.nextElementSibling;
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 2000);
+    }
+    
+    async function testNotification() {
+      const btn = event.target;
+      btn.textContent = 'Sending...';
+      btn.disabled = true;
+      
+      try {
+        await fetch(`/api/test-notification/${userId}`, { method: 'POST' });
+        btn.textContent = 'Sent!';
+      } catch (err) {
+        btn.textContent = 'Failed';
+      }
+      
+      setTimeout(() => {
+        btn.textContent = 'Send Test Notification';
+        btn.disabled = false;
+      }, 2000);
+    }
+    
+    function showSaveIndicator() {
+      const indicator = document.getElementById('saveIndicator');
+      indicator.classList.add('show');
+      setTimeout(() => indicator.classList.remove('show'), 1500);
+    }
+    
+    // Refresh games every minute
+    setInterval(loadGames, 60000);
+    
+    // Initialize
+    init();
+  </script>
+</body>
+</html>
