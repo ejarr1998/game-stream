@@ -552,9 +552,24 @@ app.get('/api/games/:userId', async (req, res) => {
   const gamesWithUrls = relevantGames.map(game => {
     const homeTeamData = getTeamByAbbrev(game.league, game.homeTeam);
     const awayTeamData = getTeamByAbbrev(game.league, game.awayTeam);
+    
+    let streamUrl = null;
+    if (homeTeamData && awayTeamData) {
+      streamUrl = buildStreamUrl(game.league, awayTeamData, homeTeamData);
+    } else {
+      // Fallback: build URL from team names directly
+      console.log(`Team lookup failed - home: ${game.homeTeam}, away: ${game.awayTeam}, league: ${game.league}`);
+      if (game.awayTeamName && game.homeTeamName) {
+        const awaySlug = game.awayTeamName.toLowerCase().replace(/\s+/g, '-');
+        const homeSlug = game.homeTeamName.toLowerCase().replace(/\s+/g, '-');
+        streamUrl = `${STREAM_BASE}/${game.league}/${awaySlug}-vs-${homeSlug}/`;
+        console.log(`Fallback URL: ${streamUrl}`);
+      }
+    }
+    
     return {
       ...game,
-      streamUrl: homeTeamData && awayTeamData ? buildStreamUrl(game.league, awayTeamData, homeTeamData) : null
+      streamUrl
     };
   });
   
